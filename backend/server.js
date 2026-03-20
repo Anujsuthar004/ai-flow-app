@@ -26,29 +26,46 @@ app.post('/api/ask-ai', async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
 
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.APP_URL || 'http://localhost:5173',
-        'X-Title': 'AI Flow App',
-      },
-      body: JSON.stringify({
-        model: 'google/gemma-3n-e4b-it:free',
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+  const models = [
+    'google/gemma-3n-e4b-it:free',
+    'google/gemma-3n-e2b-it:free',
+    'nvidia/nemotron-nano-9b-v2:free',
+    'liquid/lfm-2.5-1.2b-instruct:free',
+  ];
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('OpenRouter error:', errText);
-      return res.status(502).json({ error: 'AI service error', details: errText });
+  try {
+    let answer = null;
+    let lastError = null;
+
+    for (const model of models) {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.APP_URL || 'http://localhost:5173',
+          'X-Title': 'AI Flow App',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.choices?.[0]?.message?.content) {
+        answer = data.choices[0].message.content;
+        break;
+      }
+      lastError = data;
+      console.warn(`Model ${model} failed:`, JSON.stringify(data));
     }
 
-    const data = await response.json();
-    const answer = data.choices?.[0]?.message?.content || 'No response from AI.';
+    if (!answer) {
+      console.error('All models failed:', lastError);
+      return res.status(502).json({ error: 'AI service error', details: JSON.stringify(lastError) });
+    }
+
     res.json({ answer });
   } catch (err) {
     console.error('ask-ai error:', err);

@@ -42,7 +42,7 @@ ai-flow-app/
 ### 1. Clone the repo
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Anujsuthar004/ai-flow-app.git
 cd ai-flow-app
 ```
 
